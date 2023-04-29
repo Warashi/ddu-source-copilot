@@ -48,10 +48,6 @@ export class Source extends BaseSource<Params> {
           await delay(10);
         }
 
-        console.log(
-          await fn.execute(args.denops, "echo b:_copilot.suggestions"),
-        );
-
         const suggestions = await args.denops.call(
           "eval",
           "b:_copilot.suggestions",
