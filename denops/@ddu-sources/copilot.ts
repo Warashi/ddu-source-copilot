@@ -33,6 +33,8 @@ export class Source extends BaseSource<Params> {
   }): ReadableStream<Item<ActionData>[]> {
     return new ReadableStream({
       async start(controller) {
+        console.log(await fn.execute(args.denops, "lua =vim.fn.bufnr()"))
+
         if (!(await fn.exists(args.denops, "*copilot#Complete"))) {
           controller.close();
           return;
