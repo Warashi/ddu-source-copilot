@@ -1,11 +1,13 @@
 import {
   BaseSource,
+  Context,
   DduOptions,
   Item,
   SourceOptions,
 } from "https://deno.land/x/ddu_vim@v2.2.0/types.ts";
 import { batch, Denops, fn } from "https://deno.land/x/ddu_vim@v2.8.3/deps.ts";
 import { ActionData } from "https://deno.land/x/ddu_kind_word@v0.1.0/word.ts";
+import { ensure } from "https://deno.land/x/denops_std@v4.1.5/buffer/mod.ts";
 import { delay } from "https://deno.land/std@0.184.0/async/delay.ts";
 
 type Params = Record<never, never>;
@@ -26,6 +28,7 @@ export class Source extends BaseSource<Params> {
 
   override gather(args: {
     denops: Denops;
+    context: Context;
     options: DduOptions;
     sourceOptions: SourceOptions;
     sourceParams: Params;
@@ -33,41 +36,41 @@ export class Source extends BaseSource<Params> {
   }): ReadableStream<Item<ActionData>[]> {
     return new ReadableStream({
       async start(controller) {
-        console.log(await fn.execute(args.denops, "lua =vim.fn.bufnr()"))
+        return await ensure(args.denops, args.context.bufNr, async () => {
+          if (!(await fn.exists(args.denops, "*copilot#Complete"))) {
+            controller.close();
+            return;
+          }
 
-        if (!(await fn.exists(args.denops, "*copilot#Complete"))) {
+          await batch(args.denops, async (denops: Denops) => {
+            await denops.call("copilot#Suggest");
+            await denops.call("copilot#Next");
+            await denops.call("copilot#Previous");
+          });
+
+          while (!(await fn.exists(args.denops, "b:_copilot.suggestions"))) {
+            await delay(10);
+          }
+
+          const suggestions = await args.denops.call(
+            "eval",
+            "b:_copilot.suggestions",
+          ) as Suggestion[];
+
+          const items = suggestions.map((suggestion) => {
+            return {
+              word: suggestion.text,
+              display: suggestion.text,
+              kind: "word",
+              action: {
+                text: suggestion.displayText,
+              },
+            };
+          });
+
+          controller.enqueue(items);
           controller.close();
-          return;
-        }
-
-        await batch(args.denops, async (denops: Denops) => {
-          await denops.call("copilot#Suggest");
-          await denops.call("copilot#Next");
-          await denops.call("copilot#Previous");
         });
-
-        while (!(await fn.exists(args.denops, "b:_copilot.suggestions"))) {
-          await delay(10);
-        }
-
-        const suggestions = await args.denops.call(
-          "eval",
-          "b:_copilot.suggestions",
-        ) as Suggestion[];
-
-        const items = suggestions.map(({ text }) => {
-          return {
-            word: text,
-            display: text,
-            kind: "word",
-            action: {
-              text: text,
-            },
-          };
-        });
-
-        controller.enqueue(items);
-        controller.close();
       },
     });
   }
