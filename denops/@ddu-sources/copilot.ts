@@ -5,7 +5,7 @@ import {
   Item,
   SourceOptions,
 } from "https://deno.land/x/ddu_vim@v2.2.0/types.ts";
-import { batch, Denops, fn } from "https://deno.land/x/ddu_vim@v2.8.3/deps.ts";
+import { Denops, fn } from "https://deno.land/x/ddu_vim@v2.8.3/deps.ts";
 import { ActionData } from "https://deno.land/x/ddu_kind_word@v0.1.0/word.ts";
 import { ensure } from "https://deno.land/x/denops_std@v4.1.5/buffer/mod.ts";
 import { delay } from "https://deno.land/std@0.184.0/async/delay.ts";
@@ -42,13 +42,27 @@ export class Source extends BaseSource<Params> {
             return;
           }
 
-          await batch(args.denops, async (denops: Denops) => {
-            await denops.call("copilot#Suggest");
-            await denops.call("copilot#Next");
-            await denops.call("copilot#Previous");
-          });
+          await args.denops.call("copilot#Suggest");
 
           while (!(await fn.exists(args.denops, "b:_copilot.suggestions"))) {
+            await delay(10);
+          }
+
+          await args.denops.call("copilot#Next");
+          await args.denops.call("copilot#Previous");
+
+          while (!(await fn.exists(args.denops, "b:_copilot.cycling.status"))) {
+            await delay(10);
+          }
+
+          while (true) {
+            const status = await args.denops.call(
+              "eval",
+              "b:_copilot.cycling.status",
+            ) as string;
+            if (status !== "running") {
+              break;
+            }
             await delay(10);
           }
 
