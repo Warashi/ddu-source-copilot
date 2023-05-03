@@ -23,6 +23,12 @@ type Suggestion = {
   uuid: string;
 };
 
+type Copilot = {
+  first?: { status: string };
+  cycling?: { status: string };
+  suggestions?: Suggestion[];
+};
+
 export class Source extends BaseSource<Params> {
   override kind = "word";
 
@@ -36,55 +42,69 @@ export class Source extends BaseSource<Params> {
   }): ReadableStream<Item<ActionData>[]> {
     return new ReadableStream({
       async start(controller) {
-        return await ensure(args.denops, args.context.bufNr, async () => {
-          if (!(await fn.exists(args.denops, "*copilot#Complete"))) {
-            controller.close();
-            return;
-          }
+        if (!(await fn.exists(args.denops, "*copilot#Complete"))) {
+          controller.close();
+          return;
+        }
 
+        await ensure(args.denops, args.context.bufNr, async () => {
           await args.denops.call("copilot#Suggest");
+        });
 
-          while (!(await fn.exists(args.denops, "b:_copilot.suggestions"))) {
-            await delay(10);
+        while (true) {
+          const copilot = await fn.getbufvar(
+            args.denops,
+            args.context.bufNr,
+            "_copilot",
+            {},
+          ) as Copilot;
+          if (
+            copilot.first != null && copilot.first.status !== "running"
+          ) {
+            break;
           }
+          await delay(10);
+        }
 
+        await ensure(args.denops, args.context.bufNr, async () => {
+          await args.denops.call("copilot#Suggest");
           await args.denops.call("copilot#Next");
           await args.denops.call("copilot#Previous");
-
-          while (!(await fn.exists(args.denops, "b:_copilot.cycling.status"))) {
-            await delay(10);
-          }
-
-          while (true) {
-            const status = await args.denops.call(
-              "eval",
-              "b:_copilot.cycling.status",
-            ) as string;
-            if (status !== "running") {
-              break;
-            }
-            await delay(10);
-          }
-
-          const suggestions = await args.denops.call(
-            "eval",
-            "b:_copilot.suggestions",
-          ) as Suggestion[];
-
-          const items = suggestions.map((suggestion) => {
-            return {
-              word: suggestion.text,
-              display: suggestion.text,
-              kind: "word",
-              action: {
-                text: suggestion.displayText,
-              },
-            };
-          });
-
-          controller.enqueue(items);
-          controller.close();
         });
+
+        while (true) {
+          const copilot = await fn.getbufvar(
+            args.denops,
+            args.context.bufNr,
+            "_copilot",
+            {},
+          ) as Copilot;
+          if (copilot.cycling != null && copilot.cycling.status !== "running") {
+            break;
+          }
+          await delay(10);
+        }
+
+        const copilot = await fn.getbufvar(
+          args.denops,
+          args.context.bufNr,
+          "_copilot",
+          {},
+        ) as Copilot;
+        const suggestions = copilot.suggestions ?? [];
+        const items = suggestions.map((suggestion) => {
+          return {
+            word: suggestion.text,
+            display: suggestion.text,
+            kind: "word",
+            action: {
+              text: suggestion.displayText,
+            },
+          };
+        });
+
+        controller.enqueue(items);
+        controller.close();
       },
     });
   }
