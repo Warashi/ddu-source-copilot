@@ -14,20 +14,36 @@ type Params = Record<never, never>;
 
 type Suggestion = {
   displayText: string;
-  position: { character: number; line: number };
-  range: {
-    start: { character: number; line: number };
-    end: { character: number; line: number };
-  };
   text: string;
   uuid: string;
 };
 
 type Copilot = {
-  first?: { status: string };
-  cycling?: { status: string };
+  first?: {
+    status: string;
+    result?: {
+      completions?: Suggestion[];
+    };
+  };
+  cycling?: {
+    status: string;
+    result?: {
+      completions?: Suggestion[];
+    };
+  };
   suggestions?: Suggestion[];
 };
+
+function convert(suggestion: Suggestion): Item<ActionData> {
+  return {
+    word: suggestion.text,
+    display: suggestion.text,
+    kind: "word",
+    action: {
+      text: suggestion.displayText,
+    },
+  };
+}
 
 export class Source extends BaseSource<Params> {
   override kind = "word";
@@ -51,6 +67,8 @@ export class Source extends BaseSource<Params> {
           await args.denops.call("copilot#Suggest");
         });
 
+        let uuids: string[] = [];
+
         while (true) {
           const copilot = await fn.getbufvar(
             args.denops,
@@ -61,6 +79,11 @@ export class Source extends BaseSource<Params> {
           if (
             copilot.first != null && copilot.first.status !== "running"
           ) {
+            const suggestions = copilot.first?.result?.completions ?? [];
+            uuids = suggestions.map((suggestion) => suggestion.uuid);
+            const items = suggestions.map(convert);
+
+            controller.enqueue(items);
             break;
           }
           await delay(10);
@@ -80,30 +103,17 @@ export class Source extends BaseSource<Params> {
             {},
           ) as Copilot;
           if (copilot.cycling != null && copilot.cycling.status !== "running") {
+            const suggestions = copilot.suggestions ?? [];
+            const items = suggestions.filter((suggestion) =>
+              !uuids.includes(suggestion.uuid)
+            ).map(convert);
+
+            controller.enqueue(items);
             break;
           }
           await delay(10);
         }
 
-        const copilot = await fn.getbufvar(
-          args.denops,
-          args.context.bufNr,
-          "_copilot",
-          {},
-        ) as Copilot;
-        const suggestions = copilot.suggestions ?? [];
-        const items = suggestions.map((suggestion) => {
-          return {
-            word: suggestion.text,
-            display: suggestion.text,
-            kind: "word",
-            action: {
-              text: suggestion.displayText,
-            },
-          };
-        });
-
-        controller.enqueue(items);
         controller.close();
       },
     });
