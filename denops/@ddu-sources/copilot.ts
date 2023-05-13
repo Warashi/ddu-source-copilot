@@ -19,18 +19,8 @@ type Suggestion = {
 };
 
 type Copilot = {
-  first?: {
-    status: string;
-    result?: {
-      completions?: Suggestion[];
-    };
-  };
-  cycling?: {
-    status: string;
-    result?: {
-      completions?: Suggestion[];
-    };
-  };
+  first?: { status: string };
+  cycling?: { status: string };
   suggestions?: Suggestion[];
 };
 
@@ -79,7 +69,7 @@ export class Source extends BaseSource<Params> {
           if (
             copilot.first != null && copilot.first.status !== "running"
           ) {
-            const suggestions = copilot.first?.result?.completions ?? [];
+            const suggestions = copilot.suggestions ?? [];
             uuids = suggestions.map((suggestion) => suggestion.uuid);
             const items = suggestions.map(convert);
 
