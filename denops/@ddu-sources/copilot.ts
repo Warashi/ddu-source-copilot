@@ -4,11 +4,11 @@ import {
   DduOptions,
   Item,
   SourceOptions,
-} from "https://deno.land/x/ddu_vim@v2.8.5/types.ts";
-import { Denops, fn } from "https://deno.land/x/ddu_vim@v2.8.5/deps.ts";
-import { ActionData } from "https://deno.land/x/ddu_kind_word@v0.1.1/word.ts";
+} from "https://deno.land/x/ddu_vim@v2.9.0/types.ts";
+import { Denops, fn } from "https://deno.land/x/ddu_vim@v2.9.0/deps.ts";
+import { ActionData } from "https://deno.land/x/ddu_kind_word@v0.1.2/word.ts";
 import { ensure } from "https://deno.land/x/denops_std@v5.0.0/buffer/mod.ts";
-import { delay } from "https://deno.land/std@0.188.0/async/delay.ts";
+import { delay } from "https://deno.land/std@0.190.0/async/delay.ts";
 
 type Params = Record<never, never>;
 
